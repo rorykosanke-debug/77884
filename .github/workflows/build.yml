@@ -57,8 +57,8 @@ jobs:
                   applicationId "com.ledger.app"
                   minSdk 21
                   targetSdk 34
-                  versionCode 1
-                  versionName "1.0"
+                  versionCode ${{ github.run_number }}
+                  versionName "1.0.${{ github.run_number }}"
               }
               buildTypes {
                   release { minifyEnabled false }
@@ -157,4 +157,4 @@ jobs:
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: 记账小助手 v1.0.${{ github.run_number }}
-          files: app/build/outputs/apk/debug/app-debug.apk
+          files: app/build/outputs/apk/debug/app-debug.ap
