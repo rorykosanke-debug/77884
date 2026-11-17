@@ -615,4 +615,245 @@ saveApp();
 renderAll();
 </script>
 </body>
+  <script>
+/* ===================== 备份 / 恢复 ===================== */
+(function () {
+  if (window.__bkReady) return;
+  window.__bkReady = true;
+
+  const KEYS = ['chat_ledger_v4', 'chat_ledger_v3', 'price_book_v1'];
+
+  function stats() {
+    try {
+      const raw = JSON.parse(localStorage.getItem('chat_ledger_v4') || '{}');
+      const cs = raw.contacts || [];
+      const msgs = cs.reduce((s, c) => s + (c.messages || []).length, 0);
+      const prices = cs.reduce((s, c) => s + Object.keys(c.book || {}).length, 0);
+      return `当前：${cs.length} 个账单 · ${prices} 个单价 · ${msgs} 条消息`;
+    } catch (e) { return '当前：暂无数据'; }
+  }
+
+  function updateStats() {
+    const el = document.getElementById('bkStats');
+    if (el) el.textContent = stats();
+  }
+
+  function mount() {
+    const body = document.getElementById('panelBody');
+    if (!body || document.getElementById('bkSec')) return;
+
+    const sec = document.createElement('section');
+    sec.id = 'bkSec';
+    sec.className = 'mt-6 pt-4 border-t border-slate-100';
+    sec.innerHTML = `
+      <p class="text-[11px] text-slate-400 mb-1">数据备份（换手机 / 卸载前先导出）</p>
+      <p id="bkStats" class="text-[11px] text-slate-400 mb-2"></p>
+      <div class="flex gap-2">
+        <button id="bkExport" class="flex-1 py-2.5 rounded-xl bg-slate-900 text-white text-[13px]">导出备份</button>
+        <button id="bkImport" class="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 text-[13px]">导入恢复</button>
+      </div>`;
+    body.appendChild(sec);
+    updateStats();
+
+    document.getElementById('bkExport').onclick = () => openBox('export');
+    document.getElementById('bkImport').onclick = () => openBox('import');
+  }
+
+  function openBox(mode) {
+    const old = document.getElementById('bkBox');
+    if (old) old.remove();
+
+    const data = {};
+    KEYS.forEach(k => { const v = localStorage.getItem(k); if (v) data[k] = v; });
+    const payload = JSON.stringify(
+      { app: 'ledger', version: 1, time: new Date().toISOString(), data }, null, 2);
+
+    const box = document.createElement('div');
+    box.id = 'bkBox';
+    box.className = 'fixed inset-0 z-[60] flex bg-slate-900/50';
+    box.innerHTML = `
+      <div class="m-auto w-[92%] max-w-md bg-white rounded-2xl p-4 max-h-[86vh] flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-[14px] font-medium text-slate-800">${mode === 'export' ? '导出备份' : '导入恢复'}</p>
+          <button id="bkClose" class="text-[12px] text-slate-400 px-1">关闭</button>
+        </div>
+        <p class="text-[11px] leading-5 text-slate-400 mb-2">
+          ${mode === 'export'
+            ? '下面是全部数据。点「复制」，粘贴到微信收藏或备忘录保存。换手机时复制回来即可恢复。'
+            : '把之前备份的内容粘贴到下面，再点「确认恢复」。'}
+        </p>
+        <textarea id="bkText" spellcheck="false"
+          class="flex-1 min-h-[170px] text-[11px] leading-5 bg-slate-50 rounded-xl p-2.5 outline-none"
+          placeholder="${mode === 'export' ? '' : '在这里粘贴备份内容…'}"></textarea>
+        <div class="flex gap-2 mt-3">
+          <button id="bkAction" class="flex-1 py-2.5 rounded-xl text-white text-[13px] ${mode === 'export' ? 'bg-slate-900' : 'bg-[#07c160]'}">
+            ${mode === 'export' ? '复制' : '确认恢复'}
+          </button>
+          <button id="bkCancel" class="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 text-[13px]">取消</button>
+        </div>
+        <p id="bkMsg" class="text-[11px] text-emerald-600 mt-1.5 h-4"></p>
+      </div>`;
+    document.body.appendChild(box);
+
+    const ta = document.getElementById('bkText');
+    const msg = m => { document.getElementById('bkMsg').textContent = m; };
+    if (mode === 'export') ta.value = payload;
+
+    document.getElementById('bkClose').onclick = () => box.remove();
+    document.getElementById('bkCancel').onclick = () => box.remove();
+
+    document.getElementById('bkAction').onclick = async () => {
+      if (mode === 'export') {
+        try {
+          await navigator.clipboard.writeText(payload);
+          msg('已复制，去微信收藏粘贴保存');
+        } catch (e) {
+          ta.select();
+          ta.setSelectionRange(0, 999999);
+          document.execCommand('copy');
+          msg('已复制（如未成功请长按手动全选复制）');
+        }
+        return;
+      }
+
+      let obj;
+      try { obj = JSON.parse(ta.value.trim()); }
+      catch (e) { msg('内容不是有效的备份'); return; }
+
+      const d = obj && obj.data ? obj.data : obj;
+      if (!d || typeof d !== 'object') { msg('格式不对'); return; }
+
+      const keys = Object.keys(d).filter(k => k.indexOf('chat_ledger') === 0 || k.indexOf('price_book') === 0);
+      if (!keys.length) { msg('里面没有账目数据'); return; }
+
+      keys.forEach(k => localStorage.setItem(k, typeof d[k] === 'string' ? d[k] : JSON.stringify(d[k])));
+      msg('恢复成功，正在刷新…');
+      setTimeout(() => location.reload(), 700);
+    };
+  }
+
+  mount();
+  document.addEventListener('click', () => setTimeout(updateStats, 60));
+})();
+  </script><script>
+/* ===================== 备份 / 恢复 ===================== */
+(function () {
+  if (window.__bkReady) return;
+  window.__bkReady = true;
+
+  const KEYS = ['chat_ledger_v4', 'chat_ledger_v3', 'price_book_v1'];
+
+  function stats() {
+    try {
+      const raw = JSON.parse(localStorage.getItem('chat_ledger_v4') || '{}');
+      const cs = raw.contacts || [];
+      const msgs = cs.reduce((s, c) => s + (c.messages || []).length, 0);
+      const prices = cs.reduce((s, c) => s + Object.keys(c.book || {}).length, 0);
+      return `当前：${cs.length} 个账单 · ${prices} 个单价 · ${msgs} 条消息`;
+    } catch (e) { return '当前：暂无数据'; }
+  }
+
+  function updateStats() {
+    const el = document.getElementById('bkStats');
+    if (el) el.textContent = stats();
+  }
+
+  function mount() {
+    const body = document.getElementById('panelBody');
+    if (!body || document.getElementById('bkSec')) return;
+
+    const sec = document.createElement('section');
+    sec.id = 'bkSec';
+    sec.className = 'mt-6 pt-4 border-t border-slate-100';
+    sec.innerHTML = `
+      <p class="text-[11px] text-slate-400 mb-1">数据备份（换手机 / 卸载前先导出）</p>
+      <p id="bkStats" class="text-[11px] text-slate-400 mb-2"></p>
+      <div class="flex gap-2">
+        <button id="bkExport" class="flex-1 py-2.5 rounded-xl bg-slate-900 text-white text-[13px]">导出备份</button>
+        <button id="bkImport" class="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 text-[13px]">导入恢复</button>
+      </div>`;
+    body.appendChild(sec);
+    updateStats();
+
+    document.getElementById('bkExport').onclick = () => openBox('export');
+    document.getElementById('bkImport').onclick = () => openBox('import');
+  }
+
+  function openBox(mode) {
+    const old = document.getElementById('bkBox');
+    if (old) old.remove();
+
+    const data = {};
+    KEYS.forEach(k => { const v = localStorage.getItem(k); if (v) data[k] = v; });
+    const payload = JSON.stringify(
+      { app: 'ledger', version: 1, time: new Date().toISOString(), data }, null, 2);
+
+    const box = document.createElement('div');
+    box.id = 'bkBox';
+    box.className = 'fixed inset-0 z-[60] flex bg-slate-900/50';
+    box.innerHTML = `
+      <div class="m-auto w-[92%] max-w-md bg-white rounded-2xl p-4 max-h-[86vh] flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-[14px] font-medium text-slate-800">${mode === 'export' ? '导出备份' : '导入恢复'}</p>
+          <button id="bkClose" class="text-[12px] text-slate-400 px-1">关闭</button>
+        </div>
+        <p class="text-[11px] leading-5 text-slate-400 mb-2">
+          ${mode === 'export'
+            ? '下面是全部数据。点「复制」，粘贴到微信收藏或备忘录保存。换手机时复制回来即可恢复。'
+            : '把之前备份的内容粘贴到下面，再点「确认恢复」。'}
+        </p>
+        <textarea id="bkText" spellcheck="false"
+          class="flex-1 min-h-[170px] text-[11px] leading-5 bg-slate-50 rounded-xl p-2.5 outline-none"
+          placeholder="${mode === 'export' ? '' : '在这里粘贴备份内容…'}"></textarea>
+        <div class="flex gap-2 mt-3">
+          <button id="bkAction" class="flex-1 py-2.5 rounded-xl text-white text-[13px] ${mode === 'export' ? 'bg-slate-900' : 'bg-[#07c160]'}">
+            ${mode === 'export' ? '复制' : '确认恢复'}
+          </button>
+          <button id="bkCancel" class="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 text-[13px]">取消</button>
+        </div>
+        <p id="bkMsg" class="text-[11px] text-emerald-600 mt-1.5 h-4"></p>
+      </div>`;
+    document.body.appendChild(box);
+
+    const ta = document.getElementById('bkText');
+    const msg = m => { document.getElementById('bkMsg').textContent = m; };
+    if (mode === 'export') ta.value = payload;
+
+    document.getElementById('bkClose').onclick = () => box.remove();
+    document.getElementById('bkCancel').onclick = () => box.remove();
+
+    document.getElementById('bkAction').onclick = async () => {
+      if (mode === 'export') {
+        try {
+          await navigator.clipboard.writeText(payload);
+          msg('已复制，去微信收藏粘贴保存');
+        } catch (e) {
+          ta.select();
+          ta.setSelectionRange(0, 999999);
+          document.execCommand('copy');
+          msg('已复制（如未成功请长按手动全选复制）');
+        }
+        return;
+      }
+
+      let obj;
+      try { obj = JSON.parse(ta.value.trim()); }
+      catch (e) { msg('内容不是有效的备份'); return; }
+
+      const d = obj && obj.data ? obj.data : obj;
+      if (!d || typeof d !== 'object') { msg('格式不对'); return; }
+
+      const keys = Object.keys(d).filter(k => k.indexOf('chat_ledger') === 0 || k.indexOf('price_book') === 0);
+      if (!keys.length) { msg('里面没有账目数据'); return; }
+
+      keys.forEach(k => localStorage.setItem(k, typeof d[k] === 'string' ? d[k] : JSON.stringify(d[k])));
+      msg('恢复成功，正在刷新…');
+      setTimeout(() => location.reload(), 700);
+    };
+  }
+
+  mount();
+  document.addEventListener('click', () => setTimeout(updateStats, 60));
+})();
+  </script>
 </html>
