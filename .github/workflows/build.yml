@@ -21,117 +21,119 @@ jobs:
       - name: 生成安卓工程
         run: |
           set -e
+          test -f index.html
           mkdir -p app/src/main/java/com/ledger/app
           mkdir -p app/src/main/assets
 
           cat > settings.gradle << 'EOF'
-pluginManagement {
-    repositories { google(); mavenCentral(); gradlePluginPortal() }
-}
-dependencyResolutionManagement {
-    repositories { google(); mavenCentral() }
-}
-rootProject.name = "Ledger"
-include ':app'
-EOF
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          }
+          dependencyResolutionManagement {
+              repositories { google(); mavenCentral() }
+          }
+          rootProject.name = "Ledger"
+          include ':app'
+          EOF
 
           cat > build.gradle << 'EOF'
-plugins {
-    id 'com.android.application' version '8.5.2' apply false
-}
-EOF
+          plugins {
+              id 'com.android.application' version '8.5.2' apply false
+          }
+          EOF
 
           cat > gradle.properties << 'EOF'
-org.gradle.jvmargs=-Xmx3g
-android.useAndroidX=true
-EOF
+          org.gradle.jvmargs=-Xmx3g
+          android.useAndroidX=true
+          EOF
 
           cat > app/build.gradle << 'EOF'
-plugins { id 'com.android.application' }
+          plugins { id 'com.android.application' }
 
-android {
-    namespace 'com.ledger.app'
-    compileSdk 34
-    defaultConfig {
-        applicationId "com.ledger.app"
-        minSdk 21
-        targetSdk 34
-        versionCode 1
-        versionName "1.0"
-    }
-    buildTypes {
-        release { minifyEnabled false }
-    }
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
-    }
-}
-EOF
+          android {
+              namespace 'com.ledger.app'
+              compileSdk 34
+              defaultConfig {
+                  applicationId "com.ledger.app"
+                  minSdk 21
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0"
+              }
+              buildTypes {
+                  release { minifyEnabled false }
+              }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+          EOF
 
           cat > app/src/main/AndroidManifest.xml << 'EOF'
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.INTERNET"/>
-    <application
-        android:allowBackup="true"
-        android:icon="@android:drawable/ic_menu_edit"
-        android:label="记账小助手"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:configChanges="orientation|screenSize|keyboardHidden"
-            android:windowSoftInputMode="adjustResize">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
-        </activity>
-    </application>
-</manifest>
-EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <application
+                  android:allowBackup="true"
+                  android:icon="@android:drawable/ic_menu_edit"
+                  android:label="记账小助手"
+                  android:theme="@android:style/Theme.Material.Light.NoActionBar">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:configChanges="orientation|screenSize|keyboardHidden"
+                      android:windowSoftInputMode="adjustResize">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
 
           cat > app/src/main/java/com/ledger/app/MainActivity.java << 'EOF'
-package com.ledger.app;
+          package com.ledger.app;
 
-import android.app.Activity;
-import android.graphics.Color;
-import android.os.Bundle;
-import android.view.ViewGroup;
-import android.webkit.WebSettings;
-import android.webkit.WebView;
+          import android.app.Activity;
+          import android.graphics.Color;
+          import android.os.Bundle;
+          import android.view.ViewGroup;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
 
-public class MainActivity extends Activity {
-    private WebView webView;
+          public class MainActivity extends Activity {
+              private WebView webView;
 
-    @Override
-    protected void onCreate(Bundle b) {
-        super.onCreate(b);
-        webView = new WebView(this);
-        webView.setBackgroundColor(Color.parseColor("#ededed"));
-        WebSettings s = webView.getSettings();
-        s.setJavaScriptEnabled(true);
-        s.setDomStorageEnabled(true);
-        s.setDatabaseEnabled(true);
-        s.setTextZoom(100);
-        s.setSupportZoom(false);
-        s.setAllowFileAccess(true);
-        webView.loadUrl("file:///android_asset/index.html");
-        setContentView(webView, new ViewGroup.LayoutParams(-1, -1));
-    }
+              @Override
+              protected void onCreate(Bundle b) {
+                  super.onCreate(b);
+                  webView = new WebView(this);
+                  webView.setBackgroundColor(Color.parseColor("#ededed"));
+                  WebSettings s = webView.getSettings();
+                  s.setJavaScriptEnabled(true);
+                  s.setDomStorageEnabled(true);
+                  s.setDatabaseEnabled(true);
+                  s.setTextZoom(100);
+                  s.setSupportZoom(false);
+                  s.setAllowFileAccess(true);
+                  webView.loadUrl("file:///android_asset/index.html");
+                  setContentView(webView, new ViewGroup.LayoutParams(-1, -1));
+              }
 
-    @Override
-    public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) webView.goBack();
-        else super.onBackPressed();
-    }
-}
-EOF
+              @Override
+              public void onBackPressed() {
+                  if (webView != null && webView.canGoBack()) webView.goBack();
+                  else super.onBackPressed();
+              }
+          }
+          EOF
 
           cp index.html app/src/main/assets/index.html
           curl -sL https://cdn.tailwindcss.com -o app/src/main/assets/tailwind.js || true
           sed -i 's#https://cdn.tailwindcss.com#tailwind.js#g' app/src/main/assets/index.html
+
           echo "工程生成完成"
           find app/src/main -type f
 
