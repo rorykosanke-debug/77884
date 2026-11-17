@@ -1,1 +1,618 @@
 
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ededed">
+<title>记账小助手</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html, body { height: 100%; }
+  body {
+    -webkit-tap-highlight-color: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  }
+  .num { font-variant-numeric: tabular-nums; }
+  .pb-safe { padding-bottom: calc(env(safe-area-inset-bottom) + .5rem); }
+  #chat::-webkit-scrollbar, #panelBody::-webkit-scrollbar { width: 0; }
+</style>
+</head>
+<body class="bg-slate-300">
+
+<div class="mx-auto max-w-md h-[100dvh] bg-[#ededed] flex flex-col overflow-hidden shadow-2xl">
+
+  <!-- 顶部 -->
+  <header class="shrink-0 bg-[#ededed]/95 backdrop-blur border-b border-black/5 px-3 py-2.5 flex items-center gap-3">
+    <button id="headerAvatar" data-avatar
+      class="w-9 h-9 rounded-xl bg-slate-800 text-white flex items-center justify-center text-[15px] font-medium shrink-0">记</button>
+    <button id="headerName" data-avatar class="flex-1 min-w-0 text-left">
+      <p id="botName" class="text-[15px] font-medium text-slate-800 leading-tight truncate">记账小助手</p>
+      <p class="text-[11px] text-slate-400 leading-tight mt-0.5">发单即回价 · 点头像设置</p>
+    </button>
+    <button id="clearBtn" class="text-[12.5px] text-slate-500 px-2 py-1.5 shrink-0">清空</button>
+  </header>
+
+  <main id="chat" class="flex-1 overflow-y-auto px-3 py-3 space-y-3.5"></main>
+
+  <div class="shrink-0 bg-[#f7f7f7] border-t border-black/5 px-2 pt-2 pb-safe flex items-end gap-2">
+    <textarea id="input" rows="1" spellcheck="false" placeholder="粘贴单子发给我…"
+      class="flex-1 resize-none bg-white rounded-xl px-3 py-2.5 text-[14px] leading-6 text-slate-800 outline-none max-h-32"></textarea>
+    <button id="sendBtn"
+      class="shrink-0 w-10 h-10 rounded-full bg-[#07c160] text-white text-[13px] font-medium active:bg-[#06ad56] transition flex items-center justify-center">发送</button>
+  </div>
+</div>
+
+<!-- ================= 设置面板 ================= -->
+<div id="panel" class="fixed inset-0 z-40 hidden">
+  <div class="absolute inset-0 bg-slate-900/40" data-close></div>
+  <div class="absolute inset-x-0 bottom-0 mx-auto max-w-md bg-white rounded-t-3xl max-h-[88vh] flex flex-col shadow-2xl">
+    <div class="shrink-0 px-5 pt-3 pb-2">
+      <div class="w-10 h-1.5 bg-slate-200 rounded-full mx-auto mb-3"></div>
+      <div class="flex items-center justify-between">
+        <h3 class="text-[14px] font-medium text-slate-800">发单名字 · 单价 · 通讯录</h3>
+        <button data-close class="text-[12px] text-slate-400 px-1">关闭</button>
+      </div>
+    </div>
+
+    <div id="panelBody" class="flex-1 overflow-y-auto px-5 pb-8">
+
+      <!-- ① 名字 -->
+      <section class="mt-2">
+        <p class="text-[11px] text-slate-400 mb-1.5">当前账单的发单名字</p>
+        <div class="flex gap-2">
+          <input id="nameInput" type="text" maxlength="12"
+            class="flex-1 min-w-0 bg-slate-50 rounded-xl px-3 py-2.5 text-[14px] text-slate-800 outline-none focus:ring-2 focus:ring-slate-300">
+          <button id="saveNameBtn" class="px-4 rounded-xl bg-slate-900 text-white text-[13px] active:bg-slate-800">保存</button>
+        </div>
+        <p id="nameSaved" class="text-[11px] text-emerald-600 mt-1 h-4"></p>
+      </section>
+
+      <!-- ② 全部单价 -->
+      <section class="mt-4">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-[11px] text-slate-400">全部产品单价（只对当前账单生效）</p>
+          <span id="priceCount" class="text-[11px] text-slate-400"></span>
+        </div>
+        <div id="priceList" class="rounded-xl border border-slate-100 overflow-hidden"></div>
+      </section>
+
+      <!-- ③ 通讯录 -->
+      <section class="mt-5">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-[11px] text-slate-400">通讯录 · 切换不同人的账单</p>
+          <button id="addContactBtn" class="text-[12px] text-[#07c160] font-medium px-1">+ 新建</button>
+        </div>
+
+        <!-- 新建表单：不再用 prompt，直接页面内输入 -->
+        <div id="newContactForm" class="hidden mb-2">
+          <div class="flex gap-2">
+            <input id="newContactName" type="text" maxlength="12" placeholder="填入名字，如 张三"
+              class="flex-1 min-w-0 bg-slate-50 rounded-xl px-3 py-2.5 text-[13.5px] text-slate-800 outline-none focus:ring-2 focus:ring-slate-300">
+            <button id="confirmNewContact" class="px-4 rounded-xl bg-[#07c160] text-white text-[13px] active:bg-[#06ad56]">添加</button>
+            <button id="cancelNewContact" class="px-3 rounded-xl bg-slate-100 text-slate-500 text-[13px]">取消</button>
+          </div>
+        </div>
+
+        <p id="contactHint" class="text-[11px] text-amber-600 mb-1.5"></p>
+        <div id="contactList" class="space-y-1.5"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ======================= 工具 ======================= */
+const $ = id => document.getElementById(id);
+const UNIT_RE = '箱|袋|包|串|个|斤|条|盒|瓶|只|份|件|根|支|块|桶|罐|提|扎|把|颗|粒|片';
+const SEP = '[\\/\\\\＼]';
+const CN = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+const cnNum = n => CN[n] || String(n);
+
+const uid = () => Math.random().toString(36).slice(2, 9);
+const fmtNum = n => (n == null || !isFinite(n)) ? '0' : String(Math.round(n * 100) / 100);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const daySum = d => d.items.reduce((s, i) => s + (i.price != null ? i.price * i.qty : 0), 0);
+
+/* ======================= 数据 ======================= */
+const KEY = 'chat_ledger_v4';
+let app = { contacts: [], currentId: null };
+
+try {
+  const raw = JSON.parse(localStorage.getItem(KEY));
+  if (raw && Array.isArray(raw.contacts) && raw.contacts.length) app = raw;
+} catch (e) {}
+
+if (!app.contacts.length) {
+  let old = null;
+  try { old = JSON.parse(localStorage.getItem('chat_ledger_v3')); } catch (e) {}
+  const first = {
+    id: uid(), name: '记账小助手',
+    book: (old && old.book) || {},
+    messages: (old && old.messages) || [],
+    lastOrder: (old && old.lastOrder) || null
+  };
+  app.contacts.push(first);
+  app.currentId = first.id;
+}
+if (!app.contacts.some(c => c.id === app.currentId)) app.currentId = app.contacts[0].id;
+
+function getCur() {
+  let c = app.contacts.find(x => x.id === app.currentId);
+  if (!c) { c = app.contacts[0]; app.currentId = c.id; }
+  c.book = c.book || {};
+  c.messages = c.messages || [];
+  if (c.lastOrder === undefined) c.lastOrder = null;
+  return c;
+}
+
+function saveApp() {
+  app.contacts.forEach(c => { c.messages = (c.messages || []).slice(-60); });
+  try { localStorage.setItem(KEY, JSON.stringify(app)); } catch (e) {}
+}
+
+/* ======================= 解析 ======================= */
+function parseItem(raw) {
+  let body = String(raw).replace(/^\s*\d+\s*[.、)．:：]\s*/, '').trim();
+  if (!body) return null;
+
+  let unitPrice = null, total = null;
+  const pm = body.match(new RegExp(`([0-9]+(?:\\.[0-9]+)?)\\s*${SEP}\\s*([0-9]+(?:\\.[0-9]+)?)\\s*$`));
+  if (pm) {
+    unitPrice = parseFloat(pm[1]);
+    total = parseFloat(pm[2]);
+    if (!isFinite(unitPrice)) unitPrice = null;
+    body = body.slice(0, pm.index).trim();
+  }
+
+  const qm = body.match(new RegExp(`^(.*?)\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(${UNIT_RE})?\\s*$`));
+  let name, qty = 1, unit = '';
+  if (qm && qm[1].trim()) {
+    name = qm[1].trim(); qty = parseFloat(qm[2]); unit = qm[3] || '';
+  } else {
+    name = body.trim();
+  }
+  if (!name) return null;
+  if (!isFinite(qty) || qty <= 0) qty = 1;
+
+  if (unitPrice && total != null) {
+    const tq = Math.round((total / unitPrice) * 100) / 100;
+    if (Math.abs(tq - qty) > 0.001 && Math.abs(tq * qty - total) > 0.01) qty = tq;
+  }
+
+  const c = getCur();
+  let fromBook = false;
+  if (unitPrice == null && c.book[name] != null) {
+    unitPrice = c.book[name];
+    fromBook = true;
+  }
+  return { name, qty, unit, price: unitPrice, fromBook };
+}
+
+function parseText(text) {
+  const out = [];
+  let cur = null;
+  const now = new Date();
+
+  text.split(/\r?\n/).forEach(rawLine => {
+    const line = rawLine.trim();
+    if (!line) return;
+    if (/^记$/.test(line)) return;
+    if (/合计|总计|小计/.test(line)) return;
+
+    const dm = line.match(/^(\d{1,2})\s*[月\/\-]\s*(\d{1,2})\s*[日号]?\s*[:：]?\s*(.*)$/);
+    if (dm) {
+      cur = { month: +dm[1], day: +dm[2], items: [] };
+      out.push(cur);
+      const rest = dm[3].trim();
+      if (rest) { const it = parseItem(rest); if (it) cur.items.push(it); }
+      return;
+    }
+    if (!cur) {
+      cur = { month: now.getMonth() + 1, day: now.getDate(), items: [] };
+      out.push(cur);
+    }
+    const it = parseItem(line);
+    if (it) cur.items.push(it);
+  });
+
+  return out.filter(d => d.items.length);
+}
+
+/* ======================= 气泡 ======================= */
+function orderBubbleHTML(days) {
+  const unpriced = [];
+  days.forEach(d => d.items.forEach(it => { if (it.price == null) unpriced.push(it.name); }));
+
+  const blocks = days.map(d => `
+    <div class="mb-2.5 last:mb-0">
+      <div class="text-[11px] text-slate-400 mb-1">${d.month}月${d.day}日 · ${d.items.length} 项</div>
+      <div class="space-y-1">
+        ${d.items.map((it, i) => {
+          const priced = it.price != null;
+          return `<div class="flex items-baseline gap-2">
+            <span class="w-3.5 shrink-0 text-[11px] text-slate-300 num">${i + 1}</span>
+            <span class="flex-1 min-w-0 text-[13px] text-slate-800 truncate">${esc(it.name)}${fmtNum(it.qty)}${esc(it.unit || '')}</span>
+            ${priced
+              ? `<span class="shrink-0 text-[12.5px] text-slate-500 num">${fmtNum(it.price)}\\${fmtNum(it.price * it.qty)}</span>`
+              : `<span class="shrink-0 text-[12px] text-amber-500">待定价</span>`}
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="mt-1 pt-1 border-t border-slate-100 flex justify-between text-[12.5px]">
+        <span class="text-slate-400">小计</span>
+        <span class="num text-slate-700 font-medium">${fmtNum(daySum(d))}</span>
+      </div>
+    </div>`).join('');
+
+  const grand = days.reduce((s, d) => s + daySum(d), 0);
+
+  return `
+    <div class="text-[13.5px]">
+      ${blocks}
+      <div class="mt-1.5 pt-1.5 border-t border-slate-200 flex items-baseline justify-between">
+        <span class="text-[12.5px] text-slate-500">${days.length > 1 ? days.length + ' 天' : ''}合计</span>
+        <span class="num text-[16px] font-semibold text-slate-900">¥${fmtNum(grand)}</span>
+      </div>
+      ${unpriced.length ? `<div class="mt-1.5 text-[11px] leading-5 text-amber-600">
+        ${unpriced.length} 项没价：${esc(unpriced.join('、'))}<br>回复「${esc(unpriced[0])} 单价」我就补上
+      </div>` : ''}
+    </div>`;
+}
+
+function orderText(days) {
+  const blocks = days.map(d => {
+    const lines = d.items.map((it, i) => {
+      let s = `${i + 1}. ${it.name}${fmtNum(it.qty)}${it.unit || ''}`;
+      if (it.price != null) s += ` ${fmtNum(it.price)}\\${fmtNum(it.price * it.qty)}`;
+      return s;
+    });
+
+    const priced = d.items.filter(i => i.price != null);
+    let totalLine;
+    if (priced.length) {
+      const expr = priced.map(i => fmtNum(i.price * i.qty)).join('+');
+      totalLine = `总计：${expr}=${fmtNum(daySum(d))}`;
+      if (priced.length < d.items.length) totalLine += `（另有${d.items.length - priced.length}项待定价）`;
+    } else {
+      totalLine = '总计：待定价';
+    }
+    return `${d.month}月${d.day}日\n\n${lines.join('\n')}\n${totalLine}`;
+  });
+
+  let text = blocks.join('\n\n');
+  if (days.length > 1) {
+    const each = days.map(d => fmtNum(daySum(d)));
+    const grand = days.reduce((s, d) => s + daySum(d), 0);
+    text += `\n\n${cnNum(days.length)}日合计：${each.join('+')}=${fmtNum(grand)}元`;
+  }
+  return text;
+}
+
+/* ======================= 渲染聊天 ======================= */
+const COPY_ICON = `<svg viewBox="0 0 24 24" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>`;
+
+function botBubble(inner, copyIdx) {
+  const c = getCur();
+  const initial = (c.name || '记').slice(0, 1);
+  return `
+    <div class="flex items-start gap-2">
+      <button data-avatar class="w-8 h-8 shrink-0 rounded-xl bg-slate-800 text-white flex items-center justify-center text-[13px] mt-0.5 active:opacity-70">${esc(initial)}</button>
+      <div class="max-w-[82%] min-w-0">
+        <div class="bg-white rounded-xl rounded-tl-sm px-3 py-2 shadow-sm">${inner}</div>
+        ${copyIdx != null ? `
+        <button data-copy="${copyIdx}"
+          class="mt-1.5 ml-0.5 inline-flex items-center gap-1 text-[11.5px] text-slate-500 bg-white/80 px-2.5 py-1 rounded-full shadow-sm transition active:text-[#07c160]">
+          ${COPY_ICON}<span data-label>复制</span>
+        </button>` : ''}
+      </div>
+    </div>`;
+}
+
+function renderChat() {
+  const c = getCur();
+  const chat = $('chat');
+  chat.innerHTML = c.messages.map((m, i) => {
+    if (m.kind === 'order') return botBubble(orderBubbleHTML(m.days), i);
+    if (m.role === 'user') {
+      return `<div class="flex justify-end">
+        <div class="max-w-[82%] bg-[#95ec69] text-slate-800 text-[13.5px] leading-6 rounded-xl rounded-tr-sm px-3 py-2 whitespace-pre-wrap break-words">${esc(m.text)}</div>
+      </div>`;
+    }
+    return botBubble(`<div class="text-[13.5px] leading-6 text-slate-800 whitespace-pre-wrap break-words">${esc(m.text)}</div>`, null);
+  }).join('');
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function renderHeader() {
+  const c = getCur();
+  $('botName').textContent = c.name;
+  $('headerAvatar').textContent = (c.name || '记').slice(0, 1);
+}
+
+function renderAll() { renderHeader(); renderChat(); }
+
+/* ======================= 对话 ======================= */
+function push(m) { getCur().messages.push(m); }
+
+function handle(raw) {
+  const c = getCur();
+  const text = raw.trim();
+
+  const pm = text.match(/^(.{1,20}?)\s*[=:：]\s*(\d+(?:\.\d+)?)\s*元?$/)
+          || text.match(new RegExp(`^([^\\d\\s${SEP}]{1,20})\\s+(\\d+(?:\\.\\d+)?)\\s*元?$`));
+  if (pm && text.split('\n').filter(Boolean).length === 1) {
+    const name = pm[1].trim();
+    const price = parseFloat(pm[2]);
+    c.book[name] = price;
+    push({ role: 'bot', text: `已记下 · ${name} ${fmtNum(price)} 元（${c.name} 的价格表）` });
+
+    if (c.lastOrder) {
+      let filled = 0;
+      c.lastOrder.forEach(d => d.items.forEach(it => {
+        if (it.name === name && it.price == null) { it.price = price; filled++; }
+      }));
+      if (filled) push({ role: 'bot', kind: 'order', days: c.lastOrder });
+    }
+    return;
+  }
+
+  const days = parseText(text);
+  if (!days.length) {
+    push({ role: 'bot', text: '没看懂这张单 😅\n可以这样发：\n\n11月15日\n牛肉丸1袋\n炸爪2袋 60\\120\n\n或者补价：牛肉丸 35' });
+    return;
+  }
+
+  days.forEach(d => d.items.forEach(it => { if (it.price != null) c.book[it.name] = it.price; }));
+  c.lastOrder = days;
+  push({ role: 'bot', kind: 'order', days });
+}
+
+/* ======================= 发送 ======================= */
+const input = $('input');
+function autoGrow() {
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 128) + 'px';
+}
+input.addEventListener('input', autoGrow);
+
+function send() {
+  const raw = input.value.trim();
+  if (!raw) return;
+  input.value = '';
+  autoGrow();
+
+  if (/^(清空|重置|重来)$/.test(raw)) {
+    const c = getCur();
+    c.messages = [];
+    c.lastOrder = null;
+    greeting(c);
+    saveApp(); renderChat();
+    return;
+  }
+
+  push({ role: 'user', text: raw });
+  handle(raw);
+  saveApp(); renderChat();
+}
+
+$('sendBtn').addEventListener('click', send);
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 640) { e.preventDefault(); send(); }
+});
+
+/* 清空：两次点击确认，不用 confirm */
+let clearArmed = false, clearTimer = null;
+$('clearBtn').addEventListener('click', () => {
+  const btn = $('clearBtn');
+  if (!clearArmed) {
+    clearArmed = true;
+    btn.textContent = '确认清空';
+    btn.classList.add('text-rose-500');
+    clearTimeout(clearTimer);
+    clearTimer = setTimeout(() => {
+      clearArmed = false;
+      btn.textContent = '清空';
+      btn.classList.remove('text-rose-500');
+    }, 2500);
+    return;
+  }
+  clearTimeout(clearTimer);
+  clearArmed = false;
+  btn.textContent = '清空';
+  btn.classList.remove('text-rose-500');
+
+  const c = getCur();
+  c.messages = [];
+  c.lastOrder = null;
+  greeting(c);
+  saveApp(); renderChat();
+});
+
+/* ======================= 复制 ======================= */
+$('chat').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-copy]');
+  if (!btn) return;
+  const m = getCur().messages[+btn.dataset.copy];
+  if (!m || m.kind !== 'order') return;
+
+  const text = orderText(m.days);
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (err) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+  }
+  const label = btn.querySelector('[data-label]');
+  const old = label.textContent;
+  label.textContent = '已复制';
+  btn.classList.add('text-[#07c160]');
+  setTimeout(() => { label.textContent = old; btn.classList.remove('text-[#07c160]'); }, 1300);
+});
+
+/* ======================= 面板 ======================= */
+let pendingDel = null, delTimer = null, hintTimer = null;
+
+function openPanel() { renderPanel(); $('panel').classList.remove('hidden'); }
+function closePanel() { $('panel').classList.add('hidden'); }
+
+function showHint(msg) {
+  const el = $('contactHint');
+  el.textContent = msg;
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => { el.textContent = ''; }, 2200);
+}
+
+function renderPanel() {
+  const c = getCur();
+
+  $('nameInput').value = c.name;
+
+  const keys = Object.keys(c.book).sort((a, b) => a.localeCompare(b, 'zh'));
+  $('priceCount').textContent = keys.length ? `${keys.length} 个` : '';
+  $('priceList').innerHTML = keys.length
+    ? keys.map(k => `
+      <div class="flex items-center gap-2 px-3 py-2 border-b border-slate-50 last:border-0">
+        <span class="flex-1 min-w-0 text-[13px] text-slate-700 truncate">${esc(k)}</span>
+        <input data-pname="${esc(k)}" inputmode="decimal" value="${fmtNum(c.book[k])}"
+          class="w-20 text-right text-[13px] num bg-slate-50 rounded-lg py-1 px-2 outline-none focus:ring-1 focus:ring-slate-300">
+        <button data-pdel="${esc(k)}" class="text-[12px] text-slate-300 px-1 active:text-rose-500">✕</button>
+      </div>`).join('')
+    : `<p class="text-center text-[12px] text-slate-300 py-8">还没有保存过单价</p>`;
+
+  $('contactList').innerHTML = app.contacts.map(x => {
+    const active = x.id === app.currentId;
+    const n = Object.keys(x.book || {}).length;
+    const armed = pendingDel === x.id;
+    return `
+      <div class="flex items-center gap-2 rounded-xl px-3 py-2.5 ${active ? 'bg-[#eafbf1] ring-1 ring-[#07c160]/40' : 'bg-slate-50'}">
+        <div class="w-7 h-7 shrink-0 rounded-lg ${active ? 'bg-[#07c160]' : 'bg-slate-700'} text-white text-[12px] flex items-center justify-center">${esc((x.name || '记').slice(0, 1))}</div>
+        <div class="flex-1 min-w-0">
+          <p class="text-[13.5px] text-slate-800 truncate">${esc(x.name)}${active ? '<span class="ml-1 text-[10px] text-[#07c160]">当前</span>' : ''}</p>
+          <p class="text-[11px] text-slate-400">${n} 个单价 · ${(x.messages || []).length} 条消息</p>
+        </div>
+        <button data-switch="${x.id}" class="text-[12px] ${active ? 'text-slate-300' : 'text-slate-600'} px-2 py-1">${active ? '—' : '切换'}</button>
+        <button data-delcontact="${x.id}" class="text-[11.5px] px-1.5 py-1 rounded ${armed ? 'text-white bg-rose-500' : 'text-slate-300'}">${armed ? '确认删除' : '✕'}</button>
+      </div>`;
+  }).join('');
+}
+
+/* 点头像开面板 / 点遮罩关 */
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-avatar]')) { openPanel(); return; }
+  if (e.target.closest('[data-close]')) closePanel();
+});
+
+/* 改名 */
+$('saveNameBtn').addEventListener('click', () => {
+  const v = $('nameInput').value.trim();
+  if (!v) { showHint('名字不能为空'); return; }
+  getCur().name = v;
+  saveApp(); renderAll(); renderPanel();
+  $('nameSaved').textContent = '已保存';
+  setTimeout(() => { $('nameSaved').textContent = ''; }, 1500);
+});
+$('nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('saveNameBtn').click(); });
+
+/* 改 / 删单价 */
+$('priceList').addEventListener('input', e => {
+  const name = e.target.dataset.pname;
+  if (!name) return;
+  const v = parseFloat(e.target.value);
+  if (isFinite(v) && v >= 0) { getCur().book[name] = v; saveApp(); }
+});
+$('priceList').addEventListener('click', e => {
+  const name = e.target.dataset.pdel;
+  if (!name) return;
+  delete getCur().book[name];
+  saveApp(); renderPanel();
+});
+
+/* ===== 新建账单：页面内输入，不再用 prompt ===== */
+$('addContactBtn').addEventListener('click', () => {
+  const form = $('newContactForm');
+  form.classList.remove('hidden');
+  $('contactHint').textContent = '';
+  setTimeout(() => $('newContactName').focus(), 50);
+});
+
+$('cancelNewContact').addEventListener('click', () => {
+  $('newContactForm').classList.add('hidden');
+  $('newContactName').value = '';
+});
+
+function createContact() {
+  const inputEl = $('newContactName');
+  const name = inputEl.value.trim();
+  if (!name) { showHint('请先填一个名字'); inputEl.focus(); return; }
+  if (app.contacts.some(x => x.name === name)) { showHint('这个名字已经有了'); inputEl.focus(); return; }
+
+  const nc = { id: uid(), name, book: {}, messages: [], lastOrder: null };
+  app.contacts.push(nc);
+  app.currentId = nc.id;
+  greeting(nc);
+
+  inputEl.value = '';
+  $('newContactForm').classList.add('hidden');
+  saveApp(); renderAll(); renderPanel();
+  showHint(`已新建「${name}」，现在在记这一位`);
+}
+
+$('confirmNewContact').addEventListener('click', createContact);
+$('newContactName').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); createContact(); }
+});
+
+/* 切换 / 删除账单（二次点击确认，不用 confirm） */
+$('contactList').addEventListener('click', e => {
+  const sw = e.target.closest('[data-switch]');
+  if (sw) {
+    if (sw.dataset.switch === app.currentId) return;
+    app.currentId = sw.dataset.switch;
+    pendingDel = null;
+    saveApp(); renderAll(); renderPanel();
+    $('nameSaved').textContent = '';
+    showHint('已切换，单价表跟着换');
+    return;
+  }
+
+  const del = e.target.closest('[data-delcontact]');
+  if (del) {
+    const id = del.dataset.delcontact;
+    if (app.contacts.length <= 1) { showHint('至少保留一个账单'); return; }
+    if (pendingDel !== id) {
+      pendingDel = id;
+      renderPanel();
+      clearTimeout(delTimer);
+      delTimer = setTimeout(() => { pendingDel = null; renderPanel(); }, 3000);
+      return;
+    }
+    clearTimeout(delTimer);
+    pendingDel = null;
+    const target = app.contacts.find(x => x.id === id);
+    app.contacts = app.contacts.filter(x => x.id !== id);
+    if (app.currentId === id) app.currentId = app.contacts[0].id;
+    saveApp(); renderAll(); renderPanel();
+    showHint(target ? `已删除「${target.name}」` : '已删除');
+  }
+});
+
+/* ======================= 启动 ======================= */
+function greeting(c) {
+  c.messages.push({
+    role: 'bot',
+    text: `我是「${c.name}」，把单子粘进来发给我，我帮你算好价格和总数 👍\n\n· 没写价也能发：牛肉丸1袋\n· 有价写「单价\\总价」：炸爪2袋 60\\120\n· 缺价回复「牛肉丸 35」即可补上，下次自动记住\n\n点头像可改名字、看全部单价、切换别人的账单。`
+  });
+}
+
+app.contacts.forEach(c => { if (!(c.messages || []).length) greeting(c); });
+saveApp();
+renderAll();
+</script>
+</body>
+</html>
