@@ -24,6 +24,26 @@ jobs:
           test -f index.html
           mkdir -p app/src/main/java/com/ledger/app
           mkdir -p app/src/main/assets
+          mkdir -p keystore
+
+          if [ ! -f keystore/release.jks ]; then
+            echo "首次运行：生成签名文件"
+            keytool -genkeypair -v \
+              -keystore keystore/release.jks \
+              -alias ledger \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass ledger2024 -keypass ledger2024 \
+              -dname "CN=Ledger, OU=App, O=Personal, L=Beijing, ST=Beijing, C=CN"
+            git config user.email "actions@users.noreply.github.com"
+            git config user.name "actions"
+            git add keystore/release.jks
+            git commit -m "create signing keystore [skip ci]"
+            git push origin HEAD:main || echo "push skipped"
+          fi
+
+          VC=$(date -u +%y%m%d)
+          VN=$(date -u +%y.%m.%d)
+          echo "versionCode=$VC versionName=$VN"
 
           cat > settings.gradle << 'EOF'
           pluginManagement {
@@ -47,7 +67,7 @@ jobs:
           android.useAndroidX=true
           EOF
 
-          cat > app/build.gradle << 'EOF'
+          cat > app/build.gradle << EOF
           plugins { id 'com.android.application' }
 
           android {
@@ -57,11 +77,22 @@ jobs:
                   applicationId "com.ledger.app"
                   minSdk 21
                   targetSdk 34
-                  versionCode 2
-                  versionName "1.1"
+                  versionCode $VC
+                  versionName "$VN"
+              }
+              signingConfigs {
+                  release {
+                      storeFile file("../keystore/release.jks")
+                      storePassword "ledger2024"
+                      keyAlias "ledger"
+                      keyPassword "ledger2024"
+                  }
               }
               buildTypes {
-                  release { minifyEnabled false }
+                  release {
+                      signingConfig signingConfigs.release
+                      minifyEnabled false
+                  }
               }
               compileOptions {
                   sourceCompatibility JavaVersion.VERSION_17
@@ -144,17 +175,17 @@ jobs:
           echo "$PWD/gradle-8.7/bin" >> $GITHUB_PATH
 
       - name: 编译 APK
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: gradle assembleRelease --no-daemon --stacktrace
 
       - name: 上传产物
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: app-release
+          path: app/build/outputs/apk/release/app-release.apk
 
       - name: 发布到 Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: 记账小助手 build ${{ github.run_number }}
-          files: app/build/outputs/apk/debug/app-debug.apk
+          files: app/build/outputs/apk/release/app-release.apk
